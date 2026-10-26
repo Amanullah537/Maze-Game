@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Maze Challenge: You vs. Quantum</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { margin-bottom: 5px; color: #38bdf8; text-align: center; }
+        p.subtitle { color: #94a3b8; margin-top: 0; text-align: center; }
+        
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .panel {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            width: 340px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2 { font-size: 1.2rem; margin-top: 0; text-align: center; }
+        .classical-title { color: #f43f5e; }
+        .quantum-title { color: #10b981; }
+
+        canvas {
+            background-color: #090d16;
+            border-radius: 8px;
+            border: 1px solid #475569;
+            cursor: pointer;
+        }
+
+        .stats {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            text-align: center;
+            min-height: 40px;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        button, .d-btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: bold;
+        }
+        button:hover, .d-btn:hover { background-color: #2563eb; }
+        
+        .d-btn {
+            background-color: #475569;
+            padding: 6px 12px;
+        }
+        .d-btn:hover { background-color: #64748b; }
+
+        .instructions {
+            background: #1e293b;
+            border-left: 4px solid #38bdf8;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.9rem;
+            max-width: 710px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Interactive Maze Challenge: You vs. Quantum</h1>
+    <p class="subtitle">Experience serial manual trial-and-error versus instant quantum superposition.</p>
+
+    <div class="instructions">
+        🕹️ **How to Play:** Click inside the left box once to focus, then use your <b>Arrow Keys</b> (or the on-screen buttons below) to guide the red dot to the green exit. Then click <b>Trigger Quantum Search</b> to see the quantum advantage!
+    </div>
+
+    <div class="container">
+        <!-- Classical Player Panel -->
+        <div class="panel">
+            <h2 class="classical-title">You (Classical Search)<br><span style="font-size:0.75rem; color:#94a3b8;">Serial Trial & Error</span></h2>
+            <canvas id="classicalCanvas" width="300" height="300" tabindex="0"></canvas>
+            <div class="stats" id="classicalStats">Click canvas & use Arrow Keys.<br>Moves: 0</div>
+            
+            <!-- On-screen fallback control buttons in case arrow keys don't register -->
+            <div style="display:flex; flex-direction:column; align-items:center; margin-top:5px; gap:4px;">
+                <button class="d-btn" onclick="movePlayer('Up')">⬆️ Up</button>
+                <div style="display:flex; gap:20px;">
+                    <button class="d-btn" onclick="movePlayer('Left')">⬅️ Left</button>
+                    <button class="d-btn" onclick="movePlayer('Right')">Right ➡️</button>
+                </div>
+                <button class="d-btn" onclick="movePlayer('Down')">⬇️ Down</button>
+            </div>
+
+            <button style="margin-top:10px;" onclick="resetClassical()">Restart Maze</button>
+        </div>
+
+        <!-- Quantum Panel -->
+        <div class="panel">
+            <h2 class="quantum-title">Quantum Computer<br><span style="font-size:0.75rem; color:#94a3b8;">Simultaneous Superposition</span></h2>
+            <canvas id="quantumCanvas" width="300" height="300"></canvas>
+            <div class="stats" id="quantumStats">Status: Ready<br>Method: Parallel Wave Propagation</div>
+            <button onclick="runQuantum()" style="background-color: #10b981; margin-top: 45px;">Trigger Quantum Search</button>
+        </div>
+    </div>
+
+<script>
+    const maze = [
+        [0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+        [0, 1, 0, 1, 1, 0, 1, 0, 1, 0],
+        [0, 0, 0, 1, 0, 0, 0, 0, 1, 0],
+        [1, 1, 0, 1, 0, 1, 1, 1, 1, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 1, 1, 1, 0, 1, 0, 1, 1, 0],
+        [0, 0, 0, 1, 0, 0, 0, 1, 0, 0],
+        [1, 1, 0, 1, 1, 1, 0, 1, 0, 1],
+        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 1, 1, 1, 0, 0, 0, 1, 1, 0]
+    ];
+
+    const start = {x: 0, y: 0};
+    const end = {x: 9, y: 9};
+    const tileSize = 30;
+
+    let playerPos = {x: start.x, y: start.y};
+    let moveCount = 0;
+    let gameWon = false;
+
+    const solutionPath = [
+        {x:0,y:0}, {x:0,y:1}, {x:0,y:2}, {x:1,y:2}, {x:2,y:2}, 
+        {x:2,y:3}, {x:2,y:4}, {x:3,y:4}, {x:4,y:4}, {x:4,y:5}, 
+        {x:4,y:6}, {x:5,y:6}, {x:6,y:6}, {x:6,y:7}, {x:6,y:8}, 
+        {x:7,y:8}, {x:8,y:8}, {x:8,y:9}, {x:9,y:9}
+    ];
+
+    function drawBaseCanvas(ctx) {
+        ctx.clearRect(0, 0, 300, 300);
+        for (let r = 0; r < 10; r++) {
+            for (let c = 0; c < 10; c++) {
+                if (maze[r][c] === 1) {
+                    ctx.fillStyle = '#1e293b';
+                } else {
+                    ctx.fillStyle = '#0f172a';
+                }
+                ctx.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
+                ctx.strokeStyle = '#1e293b';
+                ctx.strokeRect(c * tileSize, r * tileSize, tileSize, tileSize);
+            }
+        }
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(end.x * tileSize + 5, end.y * tileSize + 5, tileSize - 10, tileSize - 10);
+    }
+
+    function drawClassicalGame() {
+        const canvas = document.getElementById('classicalCanvas');
+        const ctx = canvas.getContext('2d');
+        drawBaseCanvas(ctx);
+
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath();
+        ctx.arc(playerPos.x * tileSize + tileSize/2, playerPos.y * tileSize + tileSize/2, 9, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function resetClassical() {
+        playerPos = {x: start.x, y: start.y};
+        moveCount = 0;
+        gameWon = false;
+        document.getElementById('classicalStats').innerHTML = `Click canvas & use Arrow Keys.<br>Moves: ${moveCount}`;
+        drawClassicalGame();
+    }
+
+    function movePlayer(direction) {
+        if (gameWon) return;
+
+        let newX = playerPos.x;
+        let newY = playerPos.y;
+
+        if (direction === 'Up') newY--;
+        else if (direction === 'Down') newY++;
+        else if (direction === 'Left') newX--;
+        else if (direction === 'Right') newX++;
+
+        if (newX >= 0 && newX < 10 && newY >= 0 && newY < 10 && maze[newY][newX] === 0) {
+            playerPos.x = newX;
+            playerPos.y = newY;
+            moveCount++;
+
+            if (playerPos.x === end.x && playerPos.y === end.y) {
+                gameWon = true;
+                document.getElementById('classicalStats').innerHTML = `🎉 Maze Completed!<br>Total Manual Moves: ${moveCount}`;
+            } else {
+                document.getElementById('classicalStats').innerHTML = `Navigating maze sequentially...<br>Moves: ${moveCount}`;
+            }
+            drawClassicalGame();
+        }
+    }
+
+    // Keyboard listener
+    window.addEventListener('keydown', function(e) {
+        if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+            e.preventDefault();
+            let dir = e.code.replace('Arrow', '');
+            movePlayer(dir);
+        }
+    });
+
+    function runQuantum() {
+        const canvas = document.getElementById('quantumCanvas');
+        const ctx = canvas.getContext('2d');
+        const stats = document.getElementById('quantumStats');
+        
+        let waveRadius = 0;
+        stats.innerHTML = `Status: Exploring ALL paths simultaneously via Superposition...`;
+
+        let qInterval = setInterval(() => {
+            drawBaseCanvas(ctx);
+
+            waveRadius += 6;
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.arc(start.x * tileSize + tileSize/2, start.y * tileSize + tileSize/2, waveRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            if (waveRadius > 350) {
+                clearInterval(qInterval);
+                
+                ctx.fillStyle = '#10b981';
+                solutionPath.forEach(pt => {
+                    ctx.fillRect(pt.x * tileSize + 6, pt.y * tileSize + 6, tileSize - 12, tileSize - 12);
+                });
+
+                stats.innerHTML = `⚡ Solved Instantly! Wave collapse isolated optimal route.`;
+            }
+        }, 30);
+    }
+
+    window.onload = () => {
+        drawClassicalGame();
+        const qCtx = document.getElementById('quantumCanvas').getContext('2d');
+        drawBaseCanvas(qCtx);
+    };
+</script>
+
+</body>
+</html>
